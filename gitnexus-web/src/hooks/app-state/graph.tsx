@@ -16,6 +16,9 @@ interface GraphStateContextValue {
   setDepthFilter: (depth: number | null) => void;
   highlightedNodeIds: Set<string>;
   setHighlightedNodeIds: (ids: Set<string>) => void;
+  /** Path of focused folder - only render nodes under this path. null = show root level */
+  focusedFolderPath: string | null;
+  setFocusedFolderPath: (path: string | null) => void;
 }
 
 const GraphStateContext = createContext<GraphStateContextValue | null>(null);
@@ -27,6 +30,7 @@ export const GraphStateProvider = ({ children }: { children: ReactNode }) => {
   const [visibleEdgeTypes, setVisibleEdgeTypes] = useState<EdgeType[]>(DEFAULT_VISIBLE_EDGES);
   const [depthFilter, setDepthFilter] = useState<number | null>(null);
   const [highlightedNodeIds, setHighlightedNodeIds] = useState<Set<string>>(new Set());
+  const [focusedFolderPath, setFocusedFolderPath] = useState<string | null>(null);
 
   const toggleLabelVisibility = useCallback((label: NodeLabel) => {
     setVisibleLabels((prev) =>
@@ -54,8 +58,10 @@ export const GraphStateProvider = ({ children }: { children: ReactNode }) => {
       setDepthFilter,
       highlightedNodeIds,
       setHighlightedNodeIds,
+      focusedFolderPath,
+      setFocusedFolderPath,
     }),
-    [graph, selectedNode, visibleLabels, visibleEdgeTypes, depthFilter, highlightedNodeIds],
+    [graph, selectedNode, visibleLabels, visibleEdgeTypes, depthFilter, highlightedNodeIds, focusedFolderPath],
   );
 
   return <GraphStateContext.Provider value={value}>{children}</GraphStateContext.Provider>;

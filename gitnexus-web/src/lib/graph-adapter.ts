@@ -386,3 +386,101 @@ export const filterGraphByDepth = (
     graph.setNodeAttribute(nodeId, 'hidden', !isLabelVisible || !isInRange);
   });
 };
+
+/**
+ * Filter graph nodes by focused folder path - hides nodes outside the scope.
+ * Works with the existing Sigma.js graph by setting 'hidden' attribute.
+ * 
+ * @param graph - The Sigma graphology graph
+ * @param knowledgeGraph - The original KnowledgeGraph (for relationship traversal)
+ * @param focusedFolderPath - The folder path to focus on (null = show all)
+ * @param visibleLabels - Label visibility filter
+ */
+export const filterGraphByFolder = (
+  graph: Graph<SigmaNodeAttributes, SigmaEdgeAttributes>,
+  knowledgeGraph: KnowledgeGraph,
+  focusedFolderPath: string | null,
+  visibleLabels: NodeLabel[],
+): void => {
+  if (focusedFolderPath === null) {
+    // No folder scope - just apply label filter
+    filterGraphByLabels(graph, visibleLabels);
+    return;
+  }
+
+  // Build hierarchy for scoping
+  const parentToChildren = new Map<string, Set<string>>();
+  const hierarchyRelations = new Set(['CONTAINS', 'DEFINES', 'IMPORTS']);
+
+  knowledgeGraph.relationships.forEach(rel => {
+    if (hierarchyRelations.has(rel.type)) {
+      if (!parentToChildren.has(rel.sourceId)) {
+        parentToChildren.set(rel.sourceId, new Set());
+      }
+      parentToChildren.get(rel.sourceId)!.add(rel.targetId);
+    }
+  });
+
+  const nodeMap = new Map(knowledgeGraph.nodes.map(n => [n.id, n]));
+  const visibleNodeIds = new Set<string>();
+  const normalizedPath = focusedFolderPath.replace(/\/$/, '');
+
+  // Find the folder node
+  const folderNode = knowledgeGraph.nodes.find(
+    n => (n.label === 'Folder' || n.label === 'Package' || n.label === 'Module')
+      && n.properties.filePath.replace(/\/$/, '') === normalizedPath
+  );
+
+  if (folderNode) {
+    visibleNodeIds.add(folderNode.id);
+    const directChildren = parentToChildren.get(folderNode.id);
+    if (directChildren) {
+      for (const childId of directChildren) {
+        const child = nodeMap.get(childId);
+        if (child) {
+          visibleNodeIds.add(childId);
+          if (child.label === 'File') {
+            const fileChildren = parentToChildren.get(childId);
+            if (fileChildren) {
+              for (const codeId of fileChildren) {
+                const codeNode = nodeMap.get(codeId);
+                if (codeNode && codeNode.label !== 'Import') {
+                  visibleNodeIds.add(codeId);
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  } else {
+    // Fallback: match by filePath prefix
+    knowledgeGraph.nodes.forEach(node => {
+      const nodePath = node.properties.filePath.replace(/\/$/, '');
+      if (node.label === 'File' || node.label === 'Folder') {
+        const parentPath = nodePath.substring(0, nodePath.lastIndexOf('/'));
+        if (parentPath === normalizedPath || nodePath === normalizedPath) {
+          visibleNodeIds.add(node.id);
+          if (node.label === 'File') {
+            const fileChildren = parentToChildren.get(node.id);
+            if (fileChildren) {
+              for (const codeId of fileChildren) {
+                const codeNode = nodeMap.get(codeId);
+                if (codeNode && codeNode.label !== 'Import') {
+                  visibleNodeIds.add(codeId);
+                }
+              }
+            }
+          }
+        }
+      }
+    });
+  }
+
+  // Apply visibility
+  graph.forEachNode((nodeId, attributes) => {
+    const isLabelVisible = visibleLabels.includes(attributes.nodeType);
+    const isInScope = visibleNodeIds.has(nodeId);
+    graph.setNodeAttribute(nodeId, 'hidden', !isLabelVisible || !isInScope);
+  });
+};

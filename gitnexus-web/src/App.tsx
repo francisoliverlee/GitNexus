@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { AppStateProvider, useAppState } from './hooks/useAppState';
 import { DropZone } from './components/DropZone';
 import { LoadingOverlay } from './components/LoadingOverlay';
 import { Header } from './components/Header';
 import { GraphCanvas, GraphCanvasHandle } from './components/GraphCanvas';
+import { GraphCanvas3D, GraphCanvas3DHandle } from './components/GraphCanvas3D';
 import { RightPanel } from './components/RightPanel';
 import { SettingsPanel } from './components/SettingsPanel';
 import { StatusBar } from './components/StatusBar';
@@ -21,6 +22,7 @@ import {
   type BackendRepo,
 } from './services/backend-client';
 import { ERROR_RESET_DELAY_MS } from './config/ui-constants';
+import { Box, Layers } from '@/lib/lucide-icons';
 
 const AppContent = () => {
   const {
@@ -45,9 +47,13 @@ const AppContent = () => {
     availableRepos,
     setAvailableRepos,
     switchRepo,
+    focusedFolderPath,
+    setFocusedFolderPath,
   } = useAppState();
 
   const graphCanvasRef = useRef<GraphCanvasHandle>(null);
+  const graphCanvas3DRef = useRef<GraphCanvas3DHandle>(null);
+  const [renderMode, setRenderMode] = useState<'2d' | '3d'>('2d');
 
   const handleServerConnect = useCallback(
     async (result: ConnectResult): Promise<void> => {
@@ -251,8 +257,56 @@ const AppContent = () => {
         <FileTreePanel onFocusNode={handleFocusNode} />
 
         {/* Graph area - takes remaining space */}
-        <div className="relative min-w-0 flex-1">
-          <GraphCanvas ref={graphCanvasRef} />
+        <div className="flex-1 relative min-w-0">
+          {renderMode === '2d' ? (
+            <GraphCanvas ref={graphCanvasRef} />
+          ) : (
+            <GraphCanvas3D ref={graphCanvas3DRef} />
+          )}
+
+          {/* 2D/3D Toggle Button - Bottom Left */}
+          <div className="absolute bottom-4 left-4 z-20 flex items-center gap-2">
+            <button
+              onClick={() => setRenderMode((prev) => (prev === '2d' ? '3d' : '2d'))}
+              className={`
+                flex items-center gap-2 px-3 py-2 rounded-lg border backdrop-blur-sm transition-all
+                ${renderMode === '3d'
+                  ? 'bg-accent/20 border-accent/40 text-accent hover:bg-accent/30 shadow-glow-soft'
+                  : 'bg-elevated/90 border-border-subtle text-text-secondary hover:bg-hover hover:text-text-primary'
+                }
+              `}
+              title={renderMode === '2d' ? 'Switch to 3D View' : 'Switch to 2D View'}
+            >
+              {renderMode === '2d' ? (
+                <>
+                  <Box className="w-4 h-4" />
+                  <span className="text-xs font-medium">3D</span>
+                </>
+              ) : (
+                <>
+                  <Layers className="w-4 h-4" />
+                  <span className="text-xs font-medium">2D</span>
+                </>
+              )}
+            </button>
+
+            {/* Focused folder path indicator */}
+            {focusedFolderPath !== null && (
+              <div className="flex items-center gap-1.5 px-3 py-2 bg-elevated/90 border border-border-subtle rounded-lg backdrop-blur-sm">
+                <span className="text-[10px] text-text-muted">Scope:</span>
+                <span className="text-xs font-mono text-accent truncate max-w-[200px]">
+                  {focusedFolderPath.split('/').pop() || focusedFolderPath}
+                </span>
+                <button
+                  onClick={() => setFocusedFolderPath(null)}
+                  className="ml-1 text-text-muted hover:text-text-primary transition-colors"
+                  title="Show full project graph"
+                >
+                  <span className="text-xs">✕</span>
+                </button>
+              </div>
+            )}
+          </div>
 
           {/* Code References Panel (overlay) - does NOT resize the graph, it overlaps on top */}
           {isCodePanelOpen && (codeReferences.length > 0 || !!selectedNode) && (

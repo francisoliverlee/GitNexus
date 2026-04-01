@@ -110,6 +110,10 @@ interface AppState {
   depthFilter: number | null;
   setDepthFilter: (depth: number | null) => void;
 
+  // Folder scope filter (only render nodes under this path)
+  focusedFolderPath: string | null;
+  setFocusedFolderPath: (path: string | null) => void;
+
   // Query state
   highlightedNodeIds: Set<string>;
   setHighlightedNodeIds: (ids: Set<string>) => void;
@@ -218,6 +222,8 @@ const AppStateProviderInner = ({ children }: { children: ReactNode }) => {
     setDepthFilter,
     highlightedNodeIds,
     setHighlightedNodeIds,
+    focusedFolderPath,
+    setFocusedFolderPath,
   } = useGraphState();
 
   // Right Panel
@@ -1192,6 +1198,8 @@ const AppStateProviderInner = ({ children }: { children: ReactNode }) => {
     toggleEdgeVisibility,
     depthFilter,
     setDepthFilter,
+    focusedFolderPath,
+    setFocusedFolderPath,
     highlightedNodeIds,
     setHighlightedNodeIds,
     aiCitationHighlightedNodeIds,
